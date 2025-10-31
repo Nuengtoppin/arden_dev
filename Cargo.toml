@@ -1,0 +1,11 @@
+[package]
+name = "arden"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.13.2"
+bevy_egui = "0.26.0"
+
+[workspace]
+resolver = "2"

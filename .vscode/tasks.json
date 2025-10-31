@@ -1,0 +1,39 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "watch:clippy",
+      "type": "shell",
+      "command": "cargo watch -s \"cargo clippy --all-targets --all-features -- -D warnings\"",
+      "problemMatcher": ["$rustc"],
+      "group": "build"
+    },
+    {
+      "label": "check",
+      "type": "shell",
+      "command": "cargo check --all-targets --all-features",
+      "problemMatcher": ["$rustc"],
+      "group": "build"
+    },
+    {
+      "label": "run",
+      "type": "shell",
+      "command": "cargo run",
+      "problemMatcher": ["$rustc"],
+      "group": "build"
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "cargo test",
+      "problemMatcher": ["$rustc"],
+      "group": "test"
+    },
+    {
+      "label": "fmt",
+      "type": "shell",
+      "command": "cargo fmt",
+      "problemMatcher": []
+    }
+  ]
+}
