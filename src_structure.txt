@@ -1,0 +1,6 @@
+src/
+├── main.rs
+└── gameplay/
+    ├── camera.rs
+    ├── mod.rs
+    └── player.rs
