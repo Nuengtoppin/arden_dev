@@ -1,61 +1,111 @@
-Arden — Agent Guide
+# AGENTS.md — инструкции для Codex/агентов
 
-Scope
-- Applies to the entire repository.
+## Цель репозитория
+Arden — модульный Bevy-проект с фокусом на: сетках (сектора/чанки/окточанки/субчанки), удобном дебаг-UI, и чистой архитектуре. Все изменения должны оставаться совместимыми с **Bevy 0.13.2** и **bevy_egui 0.26.0**.
 
-Tech Stack
-- Rust 2021 (stable toolchain).
-- Bevy 0.13.2, bevy_egui 0.26.0.
+## Версии и сборка
+- Rust: stable (актуальная)
+- Bevy: `0.13.2`
+- bevy_egui: `0.26.0`
 
-Run/Build/Test
-- Run: `cargo run`
-- Release build: `cargo build --release`
-- Format: `cargo fmt --all`
-- Lint: `cargo clippy --all-targets --all-features -- -D warnings`
-- Tests: `cargo test` (none yet; prefer tests for pure functions when added).
+### Команды
+- Запуск: `cargo run`
+- Release: `cargo build --release`
+- Формат: `cargo fmt --all`
+- Линт: `cargo clippy --all-targets --all-features -- -D warnings`
 
-Project Layout
-- `src/main.rs` — App setup: plugins, resources, schedules.
-- `src/engine/config.rs` — Constants, sizes, shared config/resources.
-- `src/gameplay/camera.rs` — Camera spawn, input (WASD, look, cursor lock).
-- `src/world/sectors/` — Sector data, spawning, world/sector conversions, gizmos.
-- `src/world/grid/` — Grid modes and gizmo drawers (chunk/octo/sub).
-- `src/debug/ui.rs` — Egui debug overlay (FPS, pos, sector, controls).
+## Архитектура (дерево)
 
-Controls (runtime)
-- Move: `W/A/S/D`  Elevation: `Space` / `LeftCtrl`
-- Sprint: `LeftShift` (unless held with `F`)
-- Toggle cursor lock: `LeftShift` + `F`
-- Cycle grids: `F2`  |  Toggle sector grid: `LeftShift` + `F2`
+/src
+├─ main.rs
+├─ engine/
+│ ├─ app.rs # подключение модулей/плагинов
+│ ├─ time.rs # тики/тайминг (задел)
+│ └─ config.rs # размеры, скорости, флаги
+│
+├─ world/
+│ ├─ sectors/
+│ │ ├─ mod.rs # слои/ID/активный сектор, отрисовка рамок
+│ │ └─ render.rs # вспомогательная отрисовка (если вынесено)
+│ ├─ chunks/
+│ │ ├─ mod.rs
+│ │ ├─ octo/ # окточанки 64×64×64 vox
+│ │ └─ cube/ # обычные чанки (инфраструктура)
+│ ├─ grid/ # визуализатор сеток (чанк/окто/саб/сектор)
+│ │ └─ mod.rs
+│ ├─ coords.rs # адресация и конверсии (x|z|y)
+│ ├─ voxels.rs # описание вокселя (задел)
+│ └─ lod.rs # задел под LOD/SVO/DTO
+│
+├─ gameplay/
+│ ├─ player.rs # ввод/ходьба/бег/прыжок
+│ └─ camera.rs # камера, захват курсора, колесо
+│
+├─ render/
+│ ├─ pipeline.rs # задел под пайплайн
+│ ├─ materials.rs # материалы/цвета
+│ └─ debug_draw.rs # вспомогательная отрисовка
+│
+├─ debug/
+│ ├─ mod.rs
+│ ├─ ui.rs # левая панель (Tab), правый верх (F3)
+│ ├─ input.rs # биндинги F2 / Shift+F2 / Shift+F / '/'
+│ └─ stats.rs # FPS, probe-окно, буфер
+│
+└─ utils/
+├─ math.rs
+├─ ids.rs
+├─ ring_buffer.rs # кольцевой буфер для probe
+└─ profiling.rs
 
-Coding Conventions
-- Keep changes minimal and focused; do not introduce unrelated refactors.
-- Use `rustfmt` defaults; run `cargo fmt` before submissions.
-- Prefer descriptive names over one-letter identifiers.
-- Use Bevy logging macros (`info!`, `warn!`, `error!`) rather than `println!`.
-- Keep systems small and deterministic; avoid per-frame allocations where feasible.
-- Access shared data via `Res`/`ResMut`; prefer `Query::get_single()` only when exactly one is expected.
-- When adding features that affect UX, update `src/debug/ui.rs` controls/help text.
 
-Bevy Scheduling
-- Add setup to `Startup`, frame logic to `Update`.
-- Maintain stable ordering when introducing new systems that depend on existing ones.
+## Константы и инварианты мира
+- 1 единица = **1 воксель**.
+- **Subchunk** = 32×32×32 vox.
+- **Octochunk** = 64×64×64 vox.
+- **Сектор** = 64×64×16 **окточанков**.
+- Слои секторов: нижний `layer=0`, верхний `layer=1`.
+- Порядок координат в текстах/гридах: **x | z | y**.
+- Камера спавнится в центре верхнего слоя.
 
-World/Sector Invariants
-- Sectors per axis: `3 x 3`; Layers: `2` (0 lower, 1 upper).
-- Sector dimensions (octochunks): `SECTOR_DIM_OCTO = 64 x 16 x 64`.
-- Chunk dimensions (octochunks): `CHUNK_DIM_OCTO = 8 x 8 x 8`.
-- `sector_origin_ws(sx, sz, layer)` returns the min-corner in world space.
-- `world_to_sector(Vec3)` floors then clamps to valid indices.
+## Горячие клавиши (UX)
+- `Tab` — показать/спрятать левую панель Egui (“Инструменты / Вектор / Воксель / Оптимизация / PFO”).
+- `F2` — цикл сетки: OFF → CHUNK → CHUNK+OCTO → CHUNK+OCTO+SUB.
+- `Shift+F2` — показать/спрятать рамки **секторов** (обеих слоёв).
+- `F3` — правый верх: FPS, XYZ, грид-координаты (x|z|y), мини-probe.
+- `WASD` — движение; `Shift+WASD` — ускорение (×2); `Space` — вверх; `Ctrl` — вниз.
+- Колесо мыши — зум; СКМ — навигация без скрытия курсора.
+- `Shift+F` — скрыть курсор, включить белую прицельную точку (≈30% альфа).
+- `'/'` — внизу однострочная консоль (заглушка).
 
-Module/File Organization
-- Place domain code under `src/<domain>/module.rs` (snake_case).
-- Keep public APIs narrow; re-export from module `mod.rs` where appropriate.
+## Визуал сеток
+- **Сектора**: тонкие белые каркасы для верх/низ.
+- **Окточанки**: **голубые** линии.
+- **Субчанки**: **пунктир/штрих** образца `+– – – + – – – +` по граням.
+- Лёгкое радиальное затухание линий к центру, чтобы не рябило.
 
-Performance Notes
-- Use `Gizmos` sparingly; large grid modes are for debug/visualization only.
-- Avoid heavy work in tight `Update` loops; cache derived values when possible.
+## Комбо-логика отображения
+| Shift+F2 (секторы) | F2 режим | Что видно                         |
+|---|---|---|
+| Off | 0 | Ничего кроме сцены |
+| On  | 0 | Сектора |
+| Off | 1 | Чанк |
+| On  | 1 | Сектора + Чанк |
+| Off | 2 | Чанк + Окто |
+| On  | 2 | Сектора + Чанк + Окто |
+| Off | 3 | Чанк + Окто + Саб |
+| On  | 3 | Сектора + Чанк + Окто + Саб |
 
-Licensing/Headers
-- Do not add license or copyright headers unless explicitly requested.
+## Правила для агентов
+- Держать совместимость с Bevy 0.13.2 / bevy_egui 0.26.0.
+- Новые фичи — через отдельные модули, без засорения `main.rs`.
+- Не ломать хоткеи и инварианты размеров.
+- Перед PR: `cargo fmt`, `cargo clippy -D warnings`, локальный `cargo run`.
+
+## Очередь задач (пример)
+- [ ] Отладить адресацию: world→sector→chunk→octo→sub (x|z|y).
+- [ ] Добавить подписи ID активных уровней в правом верхнем углу.
+- [ ] Вынести цвета/толщины линий в `render/materials.rs`.
+- [ ] Добавить property-тесты для модуля поворотов `world/rotation`.
+- [ ] Подготовить API для выборочного скрытия нижнего слоя сектора.
 

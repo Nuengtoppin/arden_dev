@@ -1,33 +1,119 @@
-# Arden
+## Arden Engine MVP
 
-Bevy-based 3D sandbox demonstrating a sector/chunk world layout with debug grid overlays and an in-game debug UI.
+Модульный прототип на **Bevy 0.13.2** с удобной разметкой мира (сектора/чанки/окто/суб), дебаг-панелью и FPS-камерой.
 
-## Requirements
-- Rust (stable toolchain) via rustup
-- A working graphics backend (wgpu) on your platform
+## Быстрый старт
+```bash
+cargo run
 
-## Quick Start
-- Run: `cargo run`
-- Release build: `cargo build --release`
+Системные требования
 
-## Controls
-- Move: `W/A/S/D`  Elevation: `Space` / `LeftCtrl`
-- Sprint: `LeftShift` (unless held with `F`)
-- Toggle cursor lock: `LeftShift` + `F`
-- Cycle grids: `F2`  |  Toggle sector grid: `LeftShift` + `F2`
+Rust (stable), Windows/Linux/macOS с GPU, поддерживающим wgpu (Vulkan/Metal/DX12 и т.п.).
 
-## Project Structure
-- `src/main.rs` — App setup: plugins, resources, systems.
-- `src/engine/config.rs` — Constants, sizes, and resource types.
-- `src/gameplay/camera.rs` — Camera spawn, movement, and look.
-- `src/world/sectors/mod.rs` — Sector entities, world/sector math, sector gizmos.
-- `src/world/grid/mod.rs` — Grid modes and gizmo drawers (chunk / octo / subchunk).
-- `src/debug/ui.rs` — Egui debug overlay (FPS, position, sector, controls).
+Размеры и слои
 
-## Development
-- Format: `cargo fmt --all`
-- Lint: `cargo clippy --all-targets --all-features -- -D warnings`
-- Tests: `cargo test` (none yet; add for pure functions like `world_to_sector`)
+1 ед. = 1 воксель
 
-## Notes
-- The camera starts near the upper layer, looking toward the origin.
+Subchunk = 32×32×32 vox
+
+Octochunk = 64×64×64 vox
+
+Сектор = 64×64×16 окточанков
+
+Слои секторов: нижний layer=0, верхний layer=1
+
+Порядок координат в подписях/гридах: x | z | y
+
+Камера появляется над центром верхнего слоя. Пол расположен под нижним слоем (как фон), свет — базовый.
+
+Управление
+
+Игрок
+
+Ходьба: WASD
+
+Бег: Shift+WASD (×2)
+
+Вверх/вниз: Space / Ctrl
+
+Камера: СКМ — вращение/панорамирование без скрытия курсора
+
+Зум: колесо мыши
+
+Захват курсора: Shift+F (прячет курсор, белая точка-прицел)
+
+Дебаг/инструменты
+
+Левая панель Egui: Tab
+Раздел “Инструменты” дублирует режимы сеток.
+
+Режимы сеток: F2
+OFF → CHUNK → CHUNK+OCTO → CHUNK+OCTO+SUB
+
+Сектора: Shift+F2
+Показать/скрыть верхний и нижний слои (рамки).
+
+Оверлей справа сверху: F3
+FPS, XYZ, грид-координаты (x|z|y), мини-probe (кольцевой буфер).
+
+Консоль (заглушка): '/'
+Однострочная строка ввода снизу.
+
+Визуал сеток
+
+Сектора: тонкие белые рамки двух слоёв.
+
+Окточанки: голубые линии.
+
+Субчанки: пунктир/штрих вида +– – – + – – – + по граням.
+
+Лёгкое затухание линий к центру (меньше ряби).
+
+Комбо-логика
+
+Совместное включение Shift+F2 и F2 комбинирует отображение:
+
+Shift+F2	F2 режим	Видно
+Off	0	Сцена
+On	0	Сектора
+Off	1	Чанк
+On	1	Сектора + Чанк
+Off	2	Чанк + Окто
+On	2	Сектора + Чанк + Окто
+Off	3	Чанк + Окто + Саб
+On	3	Сектора + Чанк + Окто + Саб
+Структура проекта
+
+Слои разделены по зонам ответственности:
+
+engine/ — инициализация, конфиг, тайминг
+
+world/ — сектора, чанки, координаты, grid-визуал
+
+gameplay/ — камера/движение
+
+render/ — материалы/пайплайн/отрисовка
+
+debug/ — UI, хоткеи, сбор статов, probe
+
+utils/ — буферы, math, profiling
+
+Разработка
+
+Форматирование: cargo fmt --all
+
+Линт: cargo clippy --all-targets --all-features -- -D warnings
+
+Сборка релиз: cargo build --release
+
+Дорожная карта (MVP ➜ дальше)
+
+Подписи ID на активных уровнях (сектор/чанк/окто/саб).
+
+Вынос параметров линий и цветов в render/materials.rs.
+
+Повороты N×N×N (x|z|y) в world/rotation + property-тесты.
+
+Базовый редактор вокселей (перемещение курсора, захват блока).
+
+Примитивный LOD-контур (отключение дальних сабчанков).
