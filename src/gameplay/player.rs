@@ -15,7 +15,7 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-fn spawn_player(mut commands: Commands) {
+pub(crate) fn spawn_player(mut commands: Commands) {
     commands.spawn((
         Player,
         SpatialBundle::from_transform(Transform::from_xyz(0.0, 1.5, 5.0)),

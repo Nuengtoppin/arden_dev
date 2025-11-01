@@ -2,7 +2,7 @@ use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, PrimaryWindow, Window, WindowMode};
 
-use super::player::Player;
+use super::player::{spawn_player, Player};
 
 pub struct GameplayCameraPlugin;
 
@@ -55,7 +55,7 @@ const MAX_ZOOM: f32 = 40.0;
 impl Plugin for GameplayCameraPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<CursorState>();
-        app.add_systems(Startup, (setup_camera, setup_ui));
+        app.add_systems(Startup, (setup_camera.after(spawn_player), setup_ui));
         app.add_systems(
             Update,
             (
