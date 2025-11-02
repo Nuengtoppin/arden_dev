@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use bevy::input::mouse::{MouseMotion, MouseWheel};
 
 #[derive(Component)]
 pub struct FlyCamera {
@@ -76,12 +77,22 @@ fn move_wasd(
     }
 }
 
-fn wheel_zoom(mut ev: EventReader<MouseWheel>, mut q: Query<&mut Transform, With<FlyCamera>>) {
+fn wheel_zoom(
+    mut ev: EventReader<MouseWheel>,
+    mut q: Query<&mut Transform, With<FlyCamera>>,
+) {
     let mut scroll = 0.0f32;
-    for e in ev.read() { scroll += e.y as f32; }
-    if scroll.abs() < f32::EPSILON { return; }
+    for e in ev.read() {
+        scroll += e.y as f32;
+    }
+    if scroll.abs() < f32::EPSILON {
+        return;
+    }
+
     for mut tf in q.iter_mut() {
-        // simple dolly along forward
-        tf.translation += tf.forward() * scroll * 0.5;
+        // Rust не разрешает одновременно читать и писать tf.
+        // Сначала сохраняем forward в локальную переменную.
+        let forward = tf.forward();
+        tf.translation += forward * scroll * 0.5;
     }
 }

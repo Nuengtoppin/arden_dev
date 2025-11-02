@@ -4,7 +4,7 @@
 
 pub use bevy::prelude::*;
 pub use bevy::input::mouse::{MouseMotion, MouseWheel};
-pub use bevy_math::primitives::Plane3d;
+//pub use bevy_math::primitives::Plane3d;
 pub use bevy::pbr::NotShadowCaster;
 
 /// Псевдоним для стандартного цвета/материала, чтобы не зависеть от будущих изменений.
