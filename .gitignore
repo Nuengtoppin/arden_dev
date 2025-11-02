@@ -1,5 +1,7 @@
 /target
-# Логи и временные файлы
-/log/changes/*.md
-!/log/changes/2025-11-01.md
-/log/src_structure.txt
+**/*.rs.bk
+.DS_Store
+.idea/
+.vscode/
+/log/*.tmp
+Cargo.lock

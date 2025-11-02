@@ -1,214 +1,87 @@
-use bevy::input::mouse::{MouseMotion, MouseScrollUnit, MouseWheel};
 use bevy::prelude::*;
-use bevy::window::{CursorGrabMode, PrimaryWindow, Window, WindowMode};
-
-use super::player::{spawn_player, Player};
-
-pub struct GameplayCameraPlugin;
 
 #[derive(Component)]
-struct PlayerCamera;
-
-#[derive(Component)]
-struct Crosshair;
-
-#[derive(Component)]
-struct CameraRig {
-    yaw: f32,
-    pitch: f32,
-    distance: f32,
-    focus_height: f32,
+pub struct FlyCamera {
+    pub yaw: f32,
+    pub pitch: f32,
+    pub speed: f32,      // vox/s
+    pub fast_speed: f32, // vox/s with Shift
+    pub zoom: f32,
 }
 
-impl Default for CameraRig {
-    fn default() -> Self {
-        Self {
-            yaw: 0.0,
-            pitch: -0.35,
-            distance: 10.0,
-            focus_height: 1.5,
-        }
-    }
-}
-
-impl CameraRig {
-    fn local_offset(&self) -> Vec3 {
-        let rotation = Quat::from_euler(EulerRot::YXZ, self.yaw, self.pitch, 0.0);
-        rotation * Vec3::new(0.0, 0.0, self.distance)
-    }
-
-    fn look_target(&self) -> Vec3 {
-        Vec3::new(0.0, self.focus_height, 0.0)
-    }
-}
-
-#[derive(Resource, Default)]
-struct CursorState {
-    hidden: bool,
-}
-
-const ROTATION_SENSITIVITY: f32 = 0.005;
-const ZOOM_SPEED: f32 = 1.0;
-const MIN_ZOOM: f32 = 2.0;
-const MAX_ZOOM: f32 = 40.0;
-
-impl Plugin for GameplayCameraPlugin {
+pub struct CameraControllerPlugin;
+impl Plugin for CameraControllerPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<CursorState>();
-        app.add_systems(Startup, (setup_camera.after(spawn_player), setup_ui));
-        app.add_systems(
-            Update,
-            (
-                update_camera_controls,
-                toggle_cursor_and_crosshair,
-                toggle_fullscreen,
-            ),
-        );
+        app.add_systems(Startup, spawn_camera_if_missing)
+           .add_systems(Update, (mouse_look_alt, move_wasd, wheel_zoom));
     }
 }
 
-fn setup_camera(mut commands: Commands, player_query: Query<Entity, With<Player>>) {
-    let Ok(player_entity) = player_query.get_single() else {
-        return;
-    };
-
-    let rig = CameraRig::default();
-    let offset = rig.local_offset();
-    let look_target = rig.look_target();
-
-    commands.entity(player_entity).with_children(|parent| {
-        parent.spawn((
-            Camera3dBundle {
-                transform: Transform::from_translation(offset).looking_at(look_target, Vec3::Y),
-                ..default()
-            },
-            PlayerCamera,
-            rig,
+fn spawn_camera_if_missing(mut commands: Commands, q: Query<Entity, With<Camera3d>>) {
+    if q.is_empty() {
+        commands.spawn((
+            Camera3d::default(),
+            Transform::from_xyz(12.0, 10.0, 12.0).looking_at(Vec3::ZERO, Vec3::Y),
+            FlyCamera { yaw: 0.0, pitch: -0.3, speed: 60.0, fast_speed: 120.0, zoom: 1.0 },
         ));
-    });
+    }
 }
 
-fn setup_ui(mut commands: Commands) {
-    commands.spawn((
-        Camera2dBundle {
-            camera: Camera {
-                order: 1,
-                ..default()
-            },
-            ..default()
-        },
-        Name::new("UI Camera"),
-    ));
-
-    commands.spawn((
-        NodeBundle {
-            style: Style {
-                width: Val::Px(6.0),
-                height: Val::Px(6.0),
-                position_type: PositionType::Absolute,
-                left: Val::Percent(50.0),
-                top: Val::Percent(50.0),
-                margin: UiRect {
-                    left: Val::Px(-3.0),
-                    top: Val::Px(-3.0),
-                    ..default()
-                },
-                ..default()
-            },
-            background_color: BackgroundColor(Color::rgba(1.0, 1.0, 1.0, 0.3)),
-            border_radius: BorderRadius::all(Val::Px(3.0)),
-            visibility: Visibility::Hidden,
-            ..default()
-        },
-        Crosshair,
-    ));
-}
-
-fn update_camera_controls(
-    mut motion_events: EventReader<MouseMotion>,
-    mut scroll_events: EventReader<MouseWheel>,
-    mouse_buttons: Res<ButtonInput<MouseButton>>,
-    cursor_state: Res<CursorState>,
-    mut query: Query<(&mut Transform, &mut CameraRig), With<PlayerCamera>>,
+fn mouse_look_alt(
+    mut q: Query<(&mut Transform, &mut FlyCamera)>,
+    mut ev_motion: EventReader<MouseMotion>,
+    kb: Res<ButtonInput<KeyCode>>,
 ) {
-    let Ok((mut transform, mut rig)) = query.get_single_mut() else {
-        motion_events.clear();
-        scroll_events.clear();
-        return;
-    };
+    let holding_alt = kb.any_pressed([KeyCode::AltLeft, KeyCode::AltRight]);
+    if !holding_alt { ev_motion.clear(); return; }
 
-    let mut rotation_delta = Vec2::ZERO;
-    for event in motion_events.read() {
-        rotation_delta += event.delta;
+    let sens = 0.002;
+    let mut delta = Vec2::ZERO;
+    for e in ev_motion.read() { delta += e.delta; }
+
+    for (mut tf, mut cam) in q.iter_mut() {
+        cam.yaw   -= delta.x * sens;
+        cam.pitch -= delta.y * sens;
+        cam.pitch = cam.pitch.clamp(-1.54, 1.54);
+        let rot = Quat::from_axis_angle(Vec3::Y, cam.yaw) * Quat::from_axis_angle(Vec3::X, cam.pitch);
+        tf.rotation = rot;
     }
-
-    if rotation_delta != Vec2::ZERO
-        && (mouse_buttons.pressed(MouseButton::Middle) || cursor_state.hidden)
-    {
-        // CAMERA
-        rig.yaw -= rotation_delta.x * ROTATION_SENSITIVITY;
-        rig.pitch = (rig.pitch - rotation_delta.y * ROTATION_SENSITIVITY).clamp(-1.54, 1.2);
-    }
-
-    let mut zoom_delta = 0.0;
-    for event in scroll_events.read() {
-        let amount = match event.unit {
-            MouseScrollUnit::Line => event.y * ZOOM_SPEED,
-            MouseScrollUnit::Pixel => event.y * 0.1 * ZOOM_SPEED,
-        };
-        zoom_delta += amount;
-    }
-
-    if zoom_delta.abs() > f32::EPSILON {
-        rig.distance = (rig.distance - zoom_delta).clamp(MIN_ZOOM, MAX_ZOOM);
-    }
-
-    transform.translation = rig.local_offset();
-    transform.look_at(rig.look_target(), Vec3::Y);
 }
 
-fn toggle_cursor_and_crosshair(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut windows: Query<&mut Window, With<PrimaryWindow>>,
-    mut cursor_state: ResMut<CursorState>,
-    mut crosshair_query: Query<&mut Visibility, With<Crosshair>>,
+fn move_wasd(
+    time: Res<Time>,
+    kb: Res<ButtonInput<KeyCode>>,
+    mut q: Query<(&mut Transform, &FlyCamera)>,
 ) {
-    if keyboard_input.just_pressed(KeyCode::KeyF)
-        && (keyboard_input.pressed(KeyCode::ShiftLeft)
-            || keyboard_input.pressed(KeyCode::ShiftRight))
-    {
-        cursor_state.hidden = !cursor_state.hidden;
+    let dt = time.delta_seconds();
+    for (mut tf, cam) in q.iter_mut() {
+        let mut dir = Vec3::ZERO;
+        if kb.pressed(KeyCode::KeyW) { dir.z -= 1.0; }
+        if kb.pressed(KeyCode::KeyS) { dir.z += 1.0; }
+        if kb.pressed(KeyCode::KeyA) { dir.x -= 1.0; }
+        if kb.pressed(KeyCode::KeyD) { dir.x += 1.0; }
+        if kb.pressed(KeyCode::Space) { dir.y += 1.0; }
+        if kb.pressed(KeyCode::ControlLeft) || kb.pressed(KeyCode::ControlRight) { dir.y -= 1.0; }
 
-        if let Ok(mut window) = windows.get_single_mut() {
-            window.cursor.visible = !cursor_state.hidden;
-            window.cursor.grab_mode = if cursor_state.hidden {
-                CursorGrabMode::Confined
-            } else {
-                CursorGrabMode::None
-            };
-        }
-
-        if let Ok(mut visibility) = crosshair_query.get_single_mut() {
-            *visibility = if cursor_state.hidden {
-                Visibility::Inherited
-            } else {
-                Visibility::Hidden
-            };
+        if dir.length_squared() > 0.0 {
+            dir = dir.normalize();
+            let speed = if kb.any_pressed([KeyCode::ShiftLeft, KeyCode::ShiftRight]) { cam.fast_speed } else { cam.speed };
+            // move in camera space (yaw only)
+            let forward = tf.forward();
+            let right = tf.right();
+            let up = Vec3::Y;
+            let world_move = (forward * dir.z + right * dir.x + up * dir.y) * speed * dt;
+            tf.translation += world_move;
         }
     }
 }
 
-fn toggle_fullscreen(
-    keyboard_input: Res<ButtonInput<KeyCode>>,
-    mut windows: Query<&mut Window, With<PrimaryWindow>>,
-) {
-    if keyboard_input.just_pressed(KeyCode::F11) {
-        if let Ok(mut window) = windows.get_single_mut() {
-            window.mode = match window.mode {
-                WindowMode::Windowed => WindowMode::BorderlessFullscreen,
-                WindowMode::BorderlessFullscreen | WindowMode::Fullscreen => WindowMode::Windowed,
-                other => other,
-            };
-        }
+fn wheel_zoom(mut ev: EventReader<MouseWheel>, mut q: Query<&mut Transform, With<FlyCamera>>) {
+    let mut scroll = 0.0f32;
+    for e in ev.read() { scroll += e.y as f32; }
+    if scroll.abs() < f32::EPSILON { return; }
+    for mut tf in q.iter_mut() {
+        // simple dolly along forward
+        tf.translation += tf.forward() * scroll * 0.5;
     }
 }
