@@ -4,8 +4,12 @@
 use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
+use engine::compat::*; // <-- используем слой совместимости
 
-mod engine { pub mod config; }
+mod engine {
+    pub mod config;
+    pub mod compat;
+}
 mod world { pub mod coords; pub mod grid; }
 mod vector { pub mod map; pub mod field; }
 mod aspectrolog { pub mod db; pub mod ui; }
@@ -31,36 +35,32 @@ fn main() {
 
     // Core scene
     app.add_systems(Startup, setup);
+
     // Camera controller & input
-    app.add_plugins((gameplay::camera::CameraControllerPlugin, gameplay::input::InputPlugin));
+    app.add_plugins((
+        gameplay::camera::CameraControllerPlugin,
+        gameplay::input::InputPlugin,
+    ));
+
     // Simple DevMenu pane
     app.add_plugins(ui::devmenu::DevMenuPlugin);
-    // Debug UI (FPS/coords) stub
+
+    // Debug UI (FPS/coords)
     app.add_plugins(debug::ui::DebugUiPlugin);
-    // Grid overlay stub (hook points only)
+
+    // Grid overlay stub
     app.add_plugins(world::grid::GridOverlayPlugin);
 
     app.run();
 }
 
-fn setup(mut commands: Commands) {
-    // Camera
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(12.0, 10.0, 12.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-
-    // Light
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight { shadows_enabled: false, ..default() },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ..default()
-    });
-
-    // Ground plane (visual cue)
-    commands.spawn(PbrBundle {
-        mesh: Mesh::from(shape::Plane { size: 8.0 }).into(),
-        material: StandardMaterial { base_color: Color::rgb(0.15, 0.15, 0.18), perceptual_roughness: 0.9, ..default() },
-        ..default()
-    });
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    // Используем compat-слой — вместо устаревших shape::Plane и ручного света/камеры
+    spawn_basic_camera(&mut commands);
+    spawn_basic_light(&mut commands);
+    spawn_basic_floor(&mut commands, &mut meshes, &mut materials);
 }
