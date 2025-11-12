@@ -1,7 +1,0 @@
-/target
-**/*.rs.bk
-.DS_Store
-.idea/
-.vscode/
-/log/*.tmp
-Cargo.lock
